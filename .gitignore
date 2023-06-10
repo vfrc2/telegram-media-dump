@@ -1,0 +1,6 @@
+/appKey.md
+/*.session
+/.venv
+.env
+__*
+/test
