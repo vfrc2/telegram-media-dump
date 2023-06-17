@@ -1,5 +1,6 @@
 import argparse
 import os.path
+import sys
 from datetime import datetime
 from telethon import TelegramClient, types, functions
 from pathvalidate import sanitize_filename
@@ -20,30 +21,30 @@ async def listChats(client: TelegramClient):
     pass
 
 
-async def backup(client: TelegramClient, chats: list[int], output: str):
+async def backup(client: TelegramClient, chats: list[int], output: str, **options):
     # Do simple backup
-    print('Backuping chats', chats, ' to ', output)
-
-    filename_tpl = "{chat}_{cstitle}/{chat}_{date}{ext}"
-
-    mimeTypeWhiteList = [
-        'image/jpeg',
-        'video/mp4'
-    ]
+    print(f"Backuping chats {[str(c) for c in chats]} to {output}")
 
     for chat in chats:
-        async for m in client.iter_messages(chat):
-            if m.file and m.file.mime_type in mimeTypeWhiteList:
-                chat_title = sanitize_filename(m.chat.title).replace(' ', '_')
-                values = {
-                    'chat': chat,
-                    'ctitle': chat_title,
-                    'cstitle': chat_title[:15],
-                    'date': m.date.strftime("%Y-%d-%mT%H:%M:%S"),
-                    'ext': m.file.ext
-                }
-                filename = filename_tpl.format(**values)
-                fullPath = os.path.join(output, filename)
-                if not os.path.isfile(fullPath):
-                    await client.download_media(m, fullPath)
-                    print(fullPath)
+        try:
+            entity = await client.get_entity(chat)
+            print(f"Backup chat '{entity.title}'")
+            async for m in client.iter_messages(entity):
+                if m.file and m.file.mime_type in options['mime_types']:
+                    chat_title = sanitize_filename(m.chat.title).replace(' ', '_')
+                    values = {
+                        'chat': chat,
+                        'ctitle': chat_title,
+                        'cstitle': chat_title[:15],
+                        'date': m.date.strftime("%Y-%d-%mT%H:%M:%S"),
+                        'ext': m.file.ext
+                    }
+                    filename = options['filename_tpl'].format(**values)
+                    fullPath = os.path.join(output, filename)
+                    if not os.path.isfile(fullPath):
+                        await client.download_media(m, fullPath)
+                        print(fullPath)
+        except Exception as err:
+            print(f"Error while backup chat '{chat}': {type(err)} - {err}", file=sys.stderr)
+
+            
